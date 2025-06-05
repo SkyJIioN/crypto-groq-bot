@@ -11,7 +11,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL") 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-bot = Bot(token=BOT_TOKEN) app = FastAPI()
+bot = Bot(token=BOT_TOKEN) 
+app = FastAPI()
 
 telegram_app = Application.builder().token(BOT_TOKEN).build()
 
