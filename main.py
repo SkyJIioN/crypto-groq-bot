@@ -25,7 +25,10 @@ GROQ
 
 client = Groq(api_key=GROQ_API_KEY)
 
-def get_analysis(): prompt = "Ціна BTC/USDT зараз 67,000$. Чи варто входити в позицію на 1H графіку? Відповідь коротко." response = client.chat.completions.create( model="mixtral-8x7b-32768", messages=[{"role": "user", "content": prompt}], temperature=0.3, ) return response.choices[0].message.content.strip()
+def get_analysis(): 
+prompt = "Ціна BTC/USDT зараз 67,000$. Чи варто входити в позицію на 1H графіку? Відповідь коротко." 
+response = client.chat.completions.create( model="mixtral-8x7b-32768", 
+messages=[{"role": "user", "content": prompt}], temperature=0.3, ) return response.choices[0].message.content.strip()
 
 Обробка команди
 
