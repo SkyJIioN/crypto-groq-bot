@@ -1,5 +1,11 @@
-from fastapi import FastAPI, Request from telegram import Update, Bot from telegram.ext import Application, CommandHandler, ContextTypes import os from groq import Groq import logging
-
+import os
+import logging
+from telegram import Update, Bot
+from telegram.ext import Application, CommandHandler, ContextTypes
+from groq import Groq
+import requests
+from fastapi import FastAPI, Request
+import uvicorn
 BOT_TOKEN = os.getenv("BOT_TOKEN") WEBHOOK_URL = os.getenv("WEBHOOK_URL") GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 bot = Bot(token=BOT_TOKEN) app = FastAPI()
