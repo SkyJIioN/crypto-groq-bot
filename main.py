@@ -17,6 +17,7 @@ web_app = FastAPI()
 # Токени
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+WEBHOOK_PATH = f"/{BOT_TOKEN}"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 WEBHOOK_SECRET = "securetoken123"
 
