@@ -20,7 +20,8 @@ telegram_app = Application.builder().token(BOT_TOKEN).build()
 
 logging.basicConfig(level=logging.INFO)
 
-GROQ клієнт
+GROQ 
+клієнт
 
 client = Groq(api_key=GROQ_API_KEY)
 
