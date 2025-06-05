@@ -1,3 +1,5 @@
-python-telegram-bot[webhooks]
+python-telegram-bot[webhooks]==20.6
+fastapi==0.110.0
+uvicorn==0.29.0
+groq==0.5.0
 requests
-groq
