@@ -54,7 +54,11 @@ async def telegram_webhook(request: Request):
     update = Update.de_json(data, bot)
     await app_telegram.process_update(update)
     return {"status": "ok"}
+import uvicorn
 
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
 # Root (не обов'язково)
 @app.get("/")
 async def root():
