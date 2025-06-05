@@ -1,65 +1,65 @@
 import os
 import logging
+import traceback
 from fastapi import FastAPI, Request
 from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
 from groq import Groq
 
-# Логування
-logging.basicConfig(level=logging.INFO)
+app = FastAPI()
 
-# API ключі
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# Telegram app
 bot = Bot(BOT_TOKEN)
-app_telegram = Application.builder().token(BOT_TOKEN).build()
+application = Application.builder().token(BOT_TOKEN).build()
 
-# FastAPI app
-app = FastAPI()
+logging.basicConfig(level=logging.INFO)
 
-# GROQ
-groq_client = Groq(api_key=GROQ_API_KEY)
-
-def get_btc_price():
-    # Псевдоціна, заміни на реальний API якщо треба
-    return "67000"
-
-# Команда /start
+# === Handlers ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Привіт! Надішли команду /analyze для аналізу ринку.")
+    await update.message.reply_text("Привіт! Надішли /analyze, щоб отримати аналіз BTC.")
 
-# Команда /analyze
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     btc_price = get_btc_price()
-    prompt = f"Ціна BTC/USDT зараз {btc_price}$. Чи варто входити в позицію на 1H графіку? Коротко українською."
-
-    chat_completion = groq_client.chat.completions.create(
-        model="llama3-8b-8192",
-        messages=[{"role": "user", "content": prompt}]
+    prompt = (
+        f"Ціна BTC/USDT зараз {btc_price}$. "
+        "Чи варто входити в позицію на 1H графіку? "
+        "Дай короткий трейдерський аналіз."
     )
-    reply = chat_completion.choices[0].message.content
-    await update.message.reply_text(reply)
+    client = Groq(api_key=GROQ_API_KEY)
+    response = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="mixtral-8x7b-32768",
+    )
+    answer = response.choices[0].message.content
+    await update.message.reply_text(answer)
 
-# Додаємо обробники
-app_telegram.add_handler(CommandHandler("start", start))
-app_telegram.add_handler(CommandHandler("analyze", analyze))
+def get_btc_price():
+    import requests
+    url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+    response = requests.get(url)
+    return round(float(response.json()["price"]), 2)
 
-# Webhook шлях
+application.add_handler(CommandHandler("start", start))
+application.add_handler(CommandHandler("analyze", analyze))
+
+# === FastAPI route ===
 @app.post(f"/{BOT_TOKEN}")
 async def telegram_webhook(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, bot)
-    await app_telegram.process_update(update)
+    try:
+        data = await request.json()
+        update = Update.de_json(data, bot)
+        await application.process_update(update)
+    except Exception as e:
+        print("❌ Помилка у вебхуці:", e)
+        traceback.print_exc()
     return {"status": "ok"}
-import uvicorn
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
-# Root (не обов'язково)
-@app.get("/")
-async def root():
-    return {"message": "✅ Crypto Bot is running"}
+# === Ініціалізація один раз при запуску ===
+@app.on_event("startup")
+async def on_startup():
+    await application.initialize()
+    await bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+    print(f"✅ Webhook встановлено: {WEBHOOK_URL}/{BOT_TOKEN}")
