@@ -6,7 +6,11 @@ from groq import Groq
 import requests
 from fastapi import FastAPI, Request
 import uvicorn
-BOT_TOKEN = os.getenv("BOT_TOKEN") WEBHOOK_URL = os.getenv("WEBHOOK_URL") GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+from fastapi import FastAPI, Request from telegram import Update, Bot from telegram.ext import Application, CommandHandler, ContextTypes import os from groq import Groq import logging
+
+BOT_TOKEN = os.getenv("BOT_TOKEN") 
+WEBHOOK_URL = os.getenv("WEBHOOK_URL") 
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 bot = Bot(token=BOT_TOKEN) app = FastAPI()
 
@@ -33,5 +37,4 @@ telegram_app.add_handler(CommandHandler("analyze", analyze))
 @app.post(f"/{BOT_TOKEN}") async def handle_update(request: Request): data = await request.json() update = Update.de_json(data, bot) await telegram_app.process_update(update)
 
 if name == "main": telegram_app.run_webhook( listen="0.0.0.0", port=int(os.environ.get("PORT", 5000)), webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}", secret_token="securetoken123" )
-
 
