@@ -40,8 +40,7 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         )
         answer = response.choices[0].message.content
-        await update.message.reply_text(f"💡 Відповідь:
-{answer}")
+        await update.message.reply_text(f"💡 Відповідь:{answer}")
     except Exception as e:
         logger.error(f"Groq API error: {e}")
         await update.message.reply_text("❌ Сталася помилка при зверненні до Groq API.")
