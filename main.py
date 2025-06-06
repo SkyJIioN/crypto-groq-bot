@@ -1,65 +1,78 @@
 import os
-import logging 
+import logging
 from fastapi import FastAPI, Request
-from telegram import Update, Bot 
-from telegram.ext import Application, CommandHandler, ContextTypes 
-from groq import Groq 
-import uvicorn
+from telegram import Update, Bot
+from telegram.ext import (
+    Application, CommandHandler, ContextTypes
+)
+from groq import Groq
+import asyncio
 
-Logging
+# Logging
+logging.basicConfig(level=logging.INFO)
 
-logging.basicConfig(level=logging.INFO) 
-logger = logging.getLogger(name)
-
-
-
-BOT_TOKEN = os.getenv("BOT_TOKEN") 
+# Load environment variables
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
- WEBHOOK_SECRET_PATH = f"/webhook"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-FastAPI app
+WEBHOOK_SECRET_PATH = "/webhook"
 
+# FastAPI app
 app = FastAPI()
 
-Telegram app
-
+# Telegram app
+bot = Bot(token=BOT_TOKEN)
 app_telegram = Application.builder().token(BOT_TOKEN).build()
 
-Groq client
-
+# GROQ client
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-/start command
+# Telegram command
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Привіт! Надішли будь-яке питання про криптовалюту.")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE): await update.message.reply_text("Привіт! Надішли мені запитання по крипті.")
-
-/ask command
-
-async def ask(update: Update, context: ContextTypes.DEFAULT_TYPE): query = ' '.join(context.args) if not query: await update.message.reply_text("Будь ласка, надай запит.") return
-
-try:
-    chat_completion = groq_client.chat.completions.create(
-        model="llama3-8b-8192",
+# Обробка текстових повідомлень
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    question = update.message.text
+    response = groq_client.chat.completions.create(
+        model="mixtral-8x7b-32768",
         messages=[
-            {"role": "system", "content": "Ти асистент по криптовалютах."},
-            {"role": "user", "content": query},
+            {"role": "system", "content": "Ти криптоасистент."},
+            {"role": "user", "content": question}
         ]
     )
-    reply = chat_completion.choices[0].message.content
-    await update.message.reply_text(reply)
-except Exception as e:
-    logger.error(f"Groq error: {e}")
-    await update.message.reply_text("Помилка обробки запиту.")
+    answer = response.choices[0].message.content
+    await update.message.reply_text(answer)
 
-Add handlers
+# Команди
+app_telegram.add_handler(CommandHandler("start", start))
+app_telegram.add_handler(CommandHandler("help", start))
+app_telegram.add_handler(CommandHandler("info", start))
+app_telegram.add_handler(CommandHandler("ask", handle_message))
+app_telegram.add_handler(CommandHandler("", handle_message))
 
-app_telegram.add_handler(CommandHandler("start", start)) app_telegram.add_handler(CommandHandler("ask", ask))
+# FastAPI startup
+@app.on_event("startup")
+async def startup():
+    await app_telegram.initialize()
+    await app_telegram.start()
+    await bot.set_webhook(f"{WEBHOOK_URL}")
 
-FastAPI endpoint for Telegram Webhook
+@app.on_event("shutdown")
+async def shutdown():
+    await app_telegram.stop()
+    await app_telegram.shutdown()
 
-@app.post(WEBHOOK_SECRET_PATH) async def telegram_webhook(request: Request): data = await request.json() update = Update.de_json(data, Bot(BOT_TOKEN)) await app_telegram.process_update(update) return {"status": "ok"}
+# Webhook route
+@app.post(WEBHOOK_SECRET_PATH)
+async def telegram_webhook(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, bot)
+    await app_telegram.process_update(update)
+    return {"ok": True}
 
-Запуск через uvicorn
-
-if name == "main": port = int(os.getenv("PORT", 10000)) uvicorn.run("main:app", host="0.0.0.0", port=port)
-
+# Кореневий маршрут
+@app.get("/")
+async def root():
+    return {"message": "Бот працює ✅"}
