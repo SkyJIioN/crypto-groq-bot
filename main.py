@@ -11,7 +11,7 @@ Logging
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(name)
 
-Env variables
+
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") WEBHOOK_SECRET_PATH = f"/webhook"
