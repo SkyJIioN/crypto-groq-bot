@@ -14,7 +14,8 @@ logger = logging.getLogger(name)
 
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY") WEBHOOK_SECRET_PATH = f"/webhook"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+ WEBHOOK_SECRET_PATH = f"/webhook"
 
 FastAPI app
 
