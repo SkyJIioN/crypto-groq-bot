@@ -2,9 +2,7 @@ import os
 import logging
 from fastapi import FastAPI, Request
 from telegram import Update, Bot
-from telegram.ext import (
-    Application, CommandHandler, ContextTypes
-)
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from groq import Groq
 import asyncio
 
