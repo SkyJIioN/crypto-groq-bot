@@ -1,78 +1,64 @@
 import os
-import logging
 from fastapi import FastAPI, Request
-from telegram import Update, Bot
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes,filters
-from groq import Groq
+from telegram import Update
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler, ContextTypes, filters
+)
+import logging
 import asyncio
+import openai
 
-# Logging
+# Налаштування логування
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Load environment variables
+# Ключі з env
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-WEBHOOK_SECRET_PATH = "/webhook"
-
-# FastAPI app
+# FastAPI застосунок
 app = FastAPI()
 
-# Telegram app
-bot = Bot(token=BOT_TOKEN)
+# Ініціалізація Telegram Application
 app_telegram = Application.builder().token(BOT_TOKEN).build()
 
-# GROQ client
-groq_client = Groq(api_key=GROQ_API_KEY)
-
-# Telegram command
+# ✅ Обробник команди /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привіт! Надішли будь-яке питання про криптовалюту.")
+    await update.message.reply_text("Привіт! Надішли мені повідомлення, і я відповім через Groq AI.")
 
-# Обробка текстових повідомлень
+# ✅ Обробник звичайних повідомлень
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    question = update.message.text
-    response = groq_client.chat.completions.create(
+    user_message = update.message.text
+
+    # Виклик LLM через Groq API (OpenAI сумісний)
+    response = openai.ChatCompletion.create(
         model="mixtral-8x7b-32768",
-        messages=[
-            {"role": "system", "content": "Ти криптоасистент."},
-            {"role": "user", "content": question}
-        ]
+        messages=[{"role": "user", "content": user_message}],
+        api_key=GROQ_API_KEY,
     )
-    answer = response.choices[0].message.content
-    await update.message.reply_text(answer)
 
-# Команди
+    reply_text = response["choices"][0]["message"]["content"]
+    await update.message.reply_text(reply_text)
+
+# Реєстрація обробників
 app_telegram.add_handler(CommandHandler("start", start))
-app_telegram.add_handler(CommandHandler("help", start))
-app_telegram.add_handler(CommandHandler("info", start))
-app_telegram.add_handler(CommandHandler("ask", handle_message))
-
-# Обробка будь-якого тексту, який не є командою
 app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# FastAPI startup
-@app.on_event("startup")
-async def startup():
-    await app_telegram.initialize()
-    await app_telegram.start()
-    await bot.set_webhook(f"{WEBHOOK_URL}")
-
-@app.on_event("shutdown")
-async def shutdown():
-    await app_telegram.stop()
-    await app_telegram.shutdown()
-
-# Webhook route
-@app.post(WEBHOOK_SECRET_PATH)
+# FastAPI endpoint для webhook
+@app.post("/webhook")
 async def telegram_webhook(request: Request):
     data = await request.json()
-    update = Update.de_json(data, bot)
+    update = Update.de_json(data, app_telegram.bot)
     await app_telegram.process_update(update)
-    return {"ok": True}
+    return {"status": "ok"}
 
-# Кореневий маршрут
+# Запуск Telegram-бота при старті FastAPI
+@app.on_event("startup")
+async def on_startup():
+    asyncio.create_task(app_telegram.initialize())
+    logger.info("Telegram bot initialized")
+
+# Опціональний кореневий маршрут
 @app.get("/")
-async def root():
-    return {"message": "Бот працює ✅"}
+def read_root():
+    return {"message": "Бот працює. Webhook на /webhook"}
