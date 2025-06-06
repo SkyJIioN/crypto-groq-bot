@@ -25,6 +25,22 @@ app_telegram = Application.builder().token(BOT_TOKEN).build()
 # ✅ Обробник команди /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привіт! Надішли мені повідомлення, і я відповім через Groq AI.")
+app_telegram.add_handler(CommandHandler("analyze", handle_analyze))
+
+async def handle_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Будь ласка, введіть текст для аналізу після команди /analyze.")
+        return
+
+    text = " ".join(context.args)
+    response = groq.chat.completions.create(
+        messages=[
+            {"role": "system", "content": "Ти крипто-асистент. Аналізуй повідомлення."},
+            {"role": "user", "content": text},
+        ],
+        model="mixtral-8x7b-32768",
+    )
+    await update.message.reply_text(response.choices[0].message.content)
 
 # ✅ Обробник звичайних повідомлень
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
