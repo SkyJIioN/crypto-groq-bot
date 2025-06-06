@@ -56,6 +56,10 @@ async def telegram_webhook(request: Request):
         print("❌ Помилка у вебхуці:", e)
         traceback.print_exc()
     return {"status": "ok"}
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))  # Render задає порт у $PORT
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
 
 # === Ініціалізація один раз при запуску ===
 @app.on_event("startup")
