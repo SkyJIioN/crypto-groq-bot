@@ -3,3 +3,4 @@ python-telegram-bot==20.7
 uvicorn
 httpx
 groq
+openai
