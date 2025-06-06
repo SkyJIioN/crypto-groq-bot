@@ -50,7 +50,9 @@ app_telegram.add_handler(CommandHandler("start", start))
 app_telegram.add_handler(CommandHandler("help", start))
 app_telegram.add_handler(CommandHandler("info", start))
 app_telegram.add_handler(CommandHandler("ask", handle_message))
-app_telegram.add_handler(CommandHandler("", handle_message))
+
+# Обробка будь-якого тексту, який не є командою
+app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 # FastAPI startup
 @app.on_event("startup")
