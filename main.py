@@ -84,7 +84,7 @@ app_telegram.add_error_handler(error_handler)
 
 
 # 🌐 Webhook endpoint
-@app.post("/")
+@app.post("/webhook")
 async def telegram_webhook(req: Request):
     data = await req.json()
     update = Update.de_json(data, bot)
