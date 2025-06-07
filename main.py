@@ -39,8 +39,7 @@ async def handle_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "model": "llama3-8b-8192",
         "messages": [
             {"role": "system", "content": "Ти асистент-аналітик криптовалют."},
-            {"role": "user", "content": "Зроби аналіз ринку BTC/USDT на 1 нодину Українською, з точкою входу і виходу 
-Дані бери з сайту https://www.coingecko.com/en/all-cryptocurrencies"}
+            {"role": "user", "content": "Зроби аналіз ринку BTC/USDT на 1 нодину Українською, з точкою входу і виходу,Дані бери з сайту: https://www.coingecko.com/en/all-cryptocurrencies"}
         ]
     }
 
