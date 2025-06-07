@@ -1,99 +1,74 @@
 import os
-import logging
 import requests
 from fastapi import FastAPI, Request
-from telegram import Update
-from telegram.ext import (
-    Application, CommandHandler, ContextTypes, MessageHandler, filters
-)
-from dotenv import load_dotenv
+from telegram import Update, Bot
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from groq import Groq
 
-# Завантажуємо токени
-load_dotenv()
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+WEBHOOK_SECRET_PATH = "/webhook"
 
-# FastAPI
+bot = Bot(token=TOKEN)
 app = FastAPI()
 
-# Telegram bot
-app_telegram = Application.builder().token(BOT_TOKEN).build()
+app_telegram = Application.builder().token(TOKEN).build()
 
-# Webhook шлях
-WEBHOOK_PATH = "/webhook"
+# --- Отримання актуальної ціни BTC з CoinGecko ---
+def get_btc_price():
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {"ids": "bitcoin", "vs_currencies": "usd"}
+    response = requests.get(url, params=params)
+    return response.json()["bitcoin"]["usd"]
 
-# Команда /start
-async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 Привіт! Надішли /analyze щоб отримати аналіз ринку.")
+# --- Формування запиту до Groq ---
+def ask_groq_about_btc(price):
+    groq = Groq(api_key=GROQ_API_KEY)
+    prompt = (
+        f"Ти — досвідчений криптоаналітик. Поточна ціна Bitcoin — {price} USD.\n"
+        f"Напиши короткий аналіз ринку. Дай ймовірну точку входу та виходу. Без води."
+    )
+    chat_completion = groq.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[
+            {"role": "system", "content": "Ти допомагаєш трейдерам з аналізом ринку."},
+            {"role": "user", "content": prompt},
+        ]
+    )
+    return chat_completion.choices[0].message.content
 
-from pybit.unified_trading import HTTP
-import os
+# --- Обробники Telegram ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Привіт! Надішли /analyze щоб отримати аналіз ринку BTC.")
 
-session = HTTP(
-    testnet=False,
-    api_key=os.getenv("BYBIT_API_KEY"),
-    api_secret=os.getenv("BYBIT_API_SECRET")
-)
+async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    price = get_btc_price()
+    analysis = ask_groq_about_btc(price)
+    await update.message.reply_text(f"Поточна ціна BTC: {price} USD\n\n{analysis}")
 
-async def handle_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        ticker = session.get_tickers(category="spot", symbol="BTCUSDT")["result"]["list"][0]
-        last_price = ticker["lastPrice"]
-        high_price = ticker["highPrice24h"]
-        low_price = ticker["lowPrice24h"]
-        volume = ticker["volume24h"]
+# --- Додати обробники ---
+app_telegram.add_handler(CommandHandler("start", start))
+app_telegram.add_handler(CommandHandler("analyze", analyze))
 
-        # Prompt для Groq
-        prompt = (
-            f"Аналіз ринку BTC/USDT:\n"
-            f"- Поточна ціна: {last_price}\n"
-            f"- Висока за 24г: {high_price}\n"
-            f"- Низька за 24г: {low_price}\n"
-            f"- Об'єм за 24г: {volume}\n\n"
-            f"На основі цього, напиши короткий аналіз з конкретними точками входу/виходу."
-        )
-
-        response = groq.chat.completions.create(
-            model="llama3-8b-8192",
-            messages=[
-                {"role": "system", "content": "Ти криптоаналітик. Пиши коротко і ясно."},
-                {"role": "user", "content": prompt},
-            ]
-        )
-
-        result = response.choices[0].message.content
-        await update.message.reply_text(result)
-
-    except Exception as e:
-        await update.message.reply_text("Сталася помилка при аналізі. Спробуйте пізніше.")
-        print("Помилка:", e)
-
-# Обробка тексту
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❗ Використай команду /analyze для аналізу ринку.")
-
-# Додаємо хендлери
-app_telegram.add_handler(CommandHandler("start", handle_start))
-app_telegram.add_handler(CommandHandler("analyze", handle_analyze))
-app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-# FastAPI маршрут для Telegram webhook
-@app.post(WEBHOOK_PATH)
-async def telegram_webhook(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, app_telegram.bot)
+# --- FastAPI інтеграція ---
+@app.post(WEBHOOK_SECRET_PATH)
+async def telegram_webhook(req: Request):
+    data = await req.json()
+    update = Update.de_json(data, bot)
     await app_telegram.process_update(update)
     return {"status": "ok"}
 
-# Стартуємо застосунок Telegram
-@app.on_event("startup")
-async def startup():
-    await app_telegram.initialize()
-    await app_telegram.start()
-    webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{WEBHOOK_PATH}"
-    await app_telegram.bot.set_webhook(webhook_url)
+@app.get("/")
+async def root():
+    return {"message": "Crypto bot is running!"}
 
-# Завершення роботи
+# --- Старт застосунку ---
+@app.on_event("startup")
+async def startup_event():
+    await app_telegram.initialize()
+    print("Bot initialized")
+
 @app.on_event("shutdown")
-async def shutdown():
-    await app_telegram.stop()
+async def shutdown_event():
+    await app_telegram.shutdown()
+    print("Bot shutdown")
