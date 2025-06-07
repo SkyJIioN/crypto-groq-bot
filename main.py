@@ -2,7 +2,9 @@ import os
 import requests
 from fastapi import FastAPI, Request
 from telegram import Update, Bot
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update
+import logging
 from groq import Groq
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -49,6 +51,8 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- Додати обробники ---
 app_telegram.add_handler(CommandHandler("start", start))
 app_telegram.add_handler(CommandHandler("analyze", analyze))
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logging.error(msg="Exception while handling an update:", exc_info=context.error)
 
 # --- FastAPI інтеграція ---
 @app.post(WEBHOOK_SECRET_PATH)
@@ -61,7 +65,8 @@ async def telegram_webhook(req: Request):
 @app.get("/")
 async def root():
     return {"message": "Crypto bot is running!"}
-
+Application:
+app_telegram.add_error_handler(error_handler)
 # --- Старт застосунку ---
 @app.on_event("startup")
 async def startup_event():
