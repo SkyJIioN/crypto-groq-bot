@@ -42,6 +42,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Реєстрація обробників
 app_telegram.add_handler(CommandHandler("start", start))
+app_telegram.add_handler(CommandHandler("analyze", handle_analyze))
 app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 # FastAPI endpoint для webhook
