@@ -27,8 +27,17 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Привіт! Надішли /analyze щоб отримати аналіз ринку.")
 
 # Команда /analyze
+from datetime import datetime
+
 async def handle_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔍 Аналізую...")
+
+    today = datetime.now().strftime("%d.%m.%Y")
+    user_prompt = (
+        f"Дай короткий технічний аналіз для BTC/USDT на {today}. "
+        f"Вкажи ключові рівні підтримки та опору, точку входу, тейк профіт і стоп-лосс. "
+        f"Максимум 5 речень, без води."
+    )
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -38,8 +47,8 @@ async def handle_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     payload = {
         "model": "llama3-8b-8192",
         "messages": [
-            {"role": "system", "content": "Ти асистент-аналітик криптовалют."},
-            {"role": "user", "content": "Зроби аналіз ринку BTC/USDT на 1 нодину Українською, з точкою входу і виходу"}
+            {"role": "system", "content": "Ти професійний трейдер криптовалют, який надає короткі й точні сигнали."},
+            {"role": "user", "content": user_prompt}
         ]
     }
 
