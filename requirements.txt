@@ -4,3 +4,4 @@ uvicorn
 httpx
 groq
 openai
+requests
