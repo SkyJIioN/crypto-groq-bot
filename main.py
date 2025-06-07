@@ -26,42 +26,47 @@ WEBHOOK_PATH = "/webhook"
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 Привіт! Надішли /analyze щоб отримати аналіз ринку.")
 
-# Команда /analyze
-from datetime import datetime
+from pybit.unified_trading import HTTP
+import os
+
+session = HTTP(
+    testnet=False,
+    api_key=os.getenv("BYBIT_API_KEY"),
+    api_secret=os.getenv("BYBIT_API_SECRET")
+)
 
 async def handle_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Аналізую...")
-
-    today = datetime.now().strftime("%d.%m.%Y")
-    user_prompt = (
-        f"Дай короткий технічний аналіз для BTC/USDT на {today}. "
-        f"Вкажи ключові рівні підтримки та опору, точку входу, тейк профіт і стоп-лосс. "
-        f"Максимум 5 речень, без води."
-    )
-
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "llama3-8b-8192",
-        "messages": [
-            {"role": "system", "content": "Ти професійний трейдер криптовалют, який надає короткі й точні сигнали."},
-            {"role": "user", "content": user_prompt}
-        ]
-    }
-
     try:
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            reply = response.json()["choices"][0]["message"]["content"]
-        else:
-            reply = f"❌ Groq API помилка: {response.status_code}\n{response.text}"
-    except Exception as e:
-        reply = f"❌ Внутрішня помилка:\n{e}"
+        ticker = session.get_tickers(category="spot", symbol="BTCUSDT")["result"]["list"][0]
+        last_price = ticker["lastPrice"]
+        high_price = ticker["highPrice24h"]
+        low_price = ticker["lowPrice24h"]
+        volume = ticker["volume24h"]
 
-    await update.message.reply_text(reply)
+        # Prompt для Groq
+        prompt = (
+            f"Аналіз ринку BTC/USDT:\n"
+            f"- Поточна ціна: {last_price}\n"
+            f"- Висока за 24г: {high_price}\n"
+            f"- Низька за 24г: {low_price}\n"
+            f"- Об'єм за 24г: {volume}\n\n"
+            f"На основі цього, напиши короткий аналіз з конкретними точками входу/виходу."
+        )
+
+        response = groq.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": "Ти криптоаналітик. Пиши коротко і ясно."},
+                {"role": "user", "content": prompt},
+            ]
+        )
+
+        result = response.choices[0].message.content
+        await update.message.reply_text(result)
+
+    except Exception as e:
+        await update.message.reply_text("Сталася помилка при аналізі. Спробуйте пізніше.")
+        print("Помилка:", e)
 
 # Обробка тексту
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
