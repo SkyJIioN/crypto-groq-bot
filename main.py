@@ -2,71 +2,85 @@ import os
 import logging
 import requests
 from fastapi import FastAPI, Request
-from telegram import Update, Bot
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import Update
+from telegram.ext import (
+    Application, CommandHandler, ContextTypes, MessageHandler, filters
+)
+from dotenv import load_dotenv
 
-# Логування
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Завантажуємо токени
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_SECRET_PATH = "/webhook"
-
+# FastAPI
 app = FastAPI()
-bot = Bot(token=TOKEN)
 
-app_telegram = Application.builder().token(TOKEN).build()
+# Telegram bot
+app_telegram = Application.builder().token(BOT_TOKEN).build()
 
-# /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привіт! Я крипто-бот. Надішли /analyze для аналізу.")
+# Webhook шлях
+WEBHOOK_PATH = "/webhook"
 
-# /analyze
-async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Команда /start
+async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("👋 Привіт! Надішли /analyze щоб отримати аналіз ринку.")
+
+# Команда /analyze
+async def handle_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔍 Аналізую...")
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama3-8b-8192",
+        "messages": [
+            {"role": "system", "content": "Ти асистент-аналітик криптовалют."},
+            {"role": "user", "content": "Зроби аналіз ринку BTC/USDT на 1 нодину Українською, з точкою входу і виходу 
+Дані бери з сайту https://www.coingecko.com/en/all-cryptocurrencies"}
+        ]
+    }
+
     try:
-        response = requests.get("https://api.coingecko.com/api/v3/simple/price", params={
-            "ids": "bitcoin",
-            "vs_currencies": "usd"
-        })
-        data = response.json()
-        price = data["bitcoin"]["usd"]
-
-        entry = price * 0.98
-        exit = price * 1.02
-
-        text = f"📈 Поточна ціна BTC: ${price:.2f}\n🎯 Вхід: ${entry:.2f}\n🏁 Вихід: ${exit:.2f}"
-        await update.message.reply_text(text)
-
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            reply = response.json()["choices"][0]["message"]["content"]
+        else:
+            reply = f"❌ Groq API помилка: {response.status_code}\n{response.text}"
     except Exception as e:
-        logger.error(f"Помилка аналізу: {e}")
-        await update.message.reply_text("⚠️ Виникла помилка при аналізі.")
+        reply = f"❌ Внутрішня помилка:\n{e}"
 
-# інші повідомлення
+    await update.message.reply_text(reply)
+
+# Обробка тексту
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Надішли /analyze для аналізу BTC.")
+    await update.message.reply_text("❗ Використай команду /analyze для аналізу ринку.")
 
-# хендлери
-app_telegram.add_handler(CommandHandler("start", start))
-app_telegram.add_handler(CommandHandler("analyze", analyze))
+# Додаємо хендлери
+app_telegram.add_handler(CommandHandler("start", handle_start))
+app_telegram.add_handler(CommandHandler("analyze", handle_analyze))
 app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# ✅ Ініціалізація бота перед стартом FastAPI
+# FastAPI маршрут для Telegram webhook
+@app.post(WEBHOOK_PATH)
+async def telegram_webhook(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, app_telegram.bot)
+    await app_telegram.process_update(update)
+    return {"status": "ok"}
+
+# Стартуємо застосунок Telegram
 @app.on_event("startup")
-async def on_startup():
-    logger.info("Ініціалізація Telegram Application...")
+async def startup():
     await app_telegram.initialize()
-    logger.info("Telegram Application ініціалізовано.")
+    await app_telegram.start()
+    webhook_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME')}{WEBHOOK_PATH}"
+    await app_telegram.bot.set_webhook(webhook_url)
 
-@app.post(WEBHOOK_SECRET_PATH)
-async def telegram_webhook(req: Request):
-    try:
-        update = Update.de_json(await req.json(), bot)
-        await app_telegram.process_update(update)
-        return {"status": "ok"}
-    except Exception as e:
-        logger.error(f"Виняток при обробці оновлення: {e}")
-        return {"status": "error"}
-
-@app.get("/")
-async def root():
-    return {"message": "Bot is running."}
+# Завершення роботи
+@app.on_event("shutdown")
+async def shutdown():
+    await app_telegram.stop()
