@@ -12,29 +12,25 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_SECRET_PATH = "/webhook"
 
-# Створення FastAPI застосунку
 app = FastAPI()
 bot = Bot(token=TOKEN)
 
-# Створення Telegram application
 app_telegram = Application.builder().token(TOKEN).build()
 
-# Команда /start
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привіт! Я крипто-бот. Надішли /analyze для аналізу.")
 
-# Команда /analyze
+# /analyze
 async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = requests.get("https://api.coingecko.com/api/v3/simple/price", params={
             "ids": "bitcoin",
             "vs_currencies": "usd"
         })
-
         data = response.json()
         price = data["bitcoin"]["usd"]
 
-        # Простий сигнал
         entry = price * 0.98
         exit = price * 1.02
 
@@ -45,16 +41,22 @@ async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Помилка аналізу: {e}")
         await update.message.reply_text("⚠️ Виникла помилка при аналізі.")
 
-# Обробник повідомлень
+# інші повідомлення
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Надішли /analyze для аналізу BTC.")
 
-# Додавання хендлерів
+# хендлери
 app_telegram.add_handler(CommandHandler("start", start))
 app_telegram.add_handler(CommandHandler("analyze", analyze))
 app_telegram.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# Webhook endpoint (важливо!)
+# ✅ Ініціалізація бота перед стартом FastAPI
+@app.on_event("startup")
+async def on_startup():
+    logger.info("Ініціалізація Telegram Application...")
+    await app_telegram.initialize()
+    logger.info("Telegram Application ініціалізовано.")
+
 @app.post(WEBHOOK_SECRET_PATH)
 async def telegram_webhook(req: Request):
     try:
@@ -65,7 +67,6 @@ async def telegram_webhook(req: Request):
         logger.error(f"Виняток при обробці оновлення: {e}")
         return {"status": "error"}
 
-# Ping для перевірки
 @app.get("/")
 async def root():
     return {"message": "Bot is running."}
