@@ -6,3 +6,4 @@ groq
 openai
 requests
 python-dotenv
+pybit
