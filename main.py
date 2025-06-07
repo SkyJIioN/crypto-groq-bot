@@ -4,6 +4,9 @@ from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, ContextTypes, filters
 )
+from groq import Groq
+import os
+groq = Groq(api_key=os.getenv("GROQ_API_KEY"))
 import logging
 import asyncio
 import openai
