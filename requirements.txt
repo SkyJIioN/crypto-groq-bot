@@ -5,3 +5,4 @@ httpx
 groq
 openai
 requests
+python-dotenv
